@@ -28,6 +28,85 @@ const DEFAULT_POINT_RULES = [
 
 const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark' };
 
+// 本局戰績表單：用本地 state 管理輸入，避免父層 re-render 導致金額被清掉
+const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mutedDark, inputLight, inputDark, secondaryBg }) => {
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState('win');
+  const [note, setNote] = useState('');
+
+  const handleSubmit = () => {
+    const num = parseInt(amount, 10);
+    if (!amount || isNaN(num) || num <= 0) return;
+    onAddRecord(num, type, note);
+    setAmount('');
+    setNote('');
+  };
+
+  return (
+    <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
+      <h3 className="text-base font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">本局戰績</h3>
+      <div className="space-y-4 text-center">
+        <div>
+          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>金額</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
+            onFocus={(e) => e.target.select()}
+            className={`w-full rounded-xl p-4 text-2xl font-bold text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
+          />
+        </div>
+        <div>
+          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>類型</label>
+          <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+            <button
+              type="button"
+              onClick={() => setType('win')}
+              className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                type === 'win'
+                  ? 'bg-secondary border-secondary text-white shadow-md'
+                  : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+              }`}
+            >
+              贏錢
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('expense')}
+              className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                type === 'expense'
+                  ? 'bg-primary border-primary text-white shadow-md'
+                  : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+              }`}
+            >
+              支出
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
+          <input
+            type="text"
+            placeholder="例：昨晚牌局、請客..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className={`w-full rounded-xl px-4 py-3 text-sm text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary placeholder:opacity-60`}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className={`w-full max-w-xs mx-auto block py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
+        >
+          新增紀錄
+        </button>
+      </div>
+    </section>
+  );
+};
+
 const App = () => {
   const [activeTab, setActiveTab] = useState('calc');
   const [base, setBase] = useState(30);
@@ -35,9 +114,6 @@ const App = () => {
   const [extraPoints, setExtraPoints] = useState(0);
   const [selectedPoints, setSelectedPoints] = useState({});
   const [records, setRecords] = useState([]);
-  const [manualAmount, setManualAmount] = useState('');
-  const [manualType, setManualType] = useState('win'); // 'win' | 'expense'
-  const [manualNote, setManualNote] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isDark, setIsDark] = useState(() => {
@@ -83,19 +159,16 @@ const App = () => {
     setSelectedPoints(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const addManualRecord = () => {
-    const num = parseInt(manualAmount, 10);
-    if (!manualAmount || isNaN(num) || num <= 0) return;
+  const addManualRecord = (amountNum, type, note) => {
+    if (!amountNum || amountNum <= 0) return;
     const newRecord = {
       id: Date.now(),
-      amount: manualType === 'win' ? num : -num,
+      amount: type === 'win' ? amountNum : -amountNum,
       date: new Date(),
-      type: manualType === 'win' ? 'win' : 'loss',
-      note: manualNote.trim() || undefined
+      type: type === 'win' ? 'win' : 'loss',
+      note: (note && note.trim()) || undefined
     };
-    setRecords([newRecord, ...records]);
-    setManualAmount('');
-    setManualNote('');
+    setRecords(prev => [newRecord, ...prev]);
     triggerToast();
   };
 
@@ -244,77 +317,17 @@ const App = () => {
 
   const RecordView = () => (
     <div className="space-y-8">
-      <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <h3 className="text-base font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">本局戰績</h3>
-
-        <div className="space-y-4 text-center">
-          <div>
-            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>金額</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400 dark:text-[#4a5a4a]">$</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                value={manualAmount}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
-                  setManualAmount(v);
-                }}
-                onFocus={(e) => e.target.select()}
-                className={`w-full rounded-xl p-4 pl-10 text-2xl font-bold text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>類型</label>
-            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
-              <button
-                type="button"
-                onClick={() => setManualType('win')}
-                className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                  manualType === 'win'
-                    ? 'bg-secondary border-secondary text-white shadow-md'
-                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
-                }`}
-              >
-                贏錢
-              </button>
-              <button
-                type="button"
-                onClick={() => setManualType('expense')}
-                className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                  manualType === 'expense'
-                    ? 'bg-primary border-primary text-white shadow-md'
-                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
-                }`}
-              >
-                支出
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
-            <input
-              type="text"
-              placeholder="例：昨晚牌局、請客..."
-              value={manualNote}
-              onChange={(e) => setManualNote(e.target.value)}
-              className={`w-full rounded-xl px-4 py-3 text-sm text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary placeholder:opacity-60`}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={addManualRecord}
-            className={`w-full max-w-xs mx-auto block py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
-          >
-            新增紀錄
-          </button>
-        </div>
-      </section>
+      <RecordForm
+        onAddRecord={addManualRecord}
+        cardCls={cardCls}
+        cardLight={cardLight}
+        cardDark={cardDark}
+        mutedLight={mutedLight}
+        mutedDark={mutedDark}
+        inputLight={inputLight}
+        inputDark={inputDark}
+        secondaryBg={secondaryBg}
+      />
 
       <section className="space-y-3">
         <div className="flex items-center gap-3 px-1">
