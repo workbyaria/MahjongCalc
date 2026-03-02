@@ -36,6 +36,8 @@ const App = () => {
   const [selectedPoints, setSelectedPoints] = useState({});
   const [records, setRecords] = useState([]);
   const [manualAmount, setManualAmount] = useState('');
+  const [manualType, setManualType] = useState('win'); // 'win' | 'expense'
+  const [manualNote, setManualNote] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isDark, setIsDark] = useState(() => {
@@ -82,16 +84,18 @@ const App = () => {
   };
 
   const addManualRecord = () => {
-    if (!manualAmount) return;
-    const amount = parseInt(manualAmount);
+    const num = parseInt(manualAmount, 10);
+    if (!manualAmount || isNaN(num) || num <= 0) return;
     const newRecord = {
       id: Date.now(),
-      amount,
+      amount: manualType === 'win' ? num : -num,
       date: new Date(),
-      type: amount >= 0 ? 'win' : 'loss'
+      type: manualType === 'win' ? 'win' : 'loss',
+      note: manualNote.trim() || undefined
     };
     setRecords([newRecord, ...records]);
     setManualAmount('');
+    setManualNote('');
     triggerToast();
   };
 
@@ -158,28 +162,27 @@ const App = () => {
   const CalcView = () => (
     <div className="space-y-8">
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <div className="flex justify-between items-center mb-6">
-          <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>底 / 台</span>
-          <div className="h-px flex-1 mx-4 bg-gray-200 dark:bg-[#2d302d]" />
-        </div>
-        <div className="flex justify-around items-center gap-6">
-          <div className="flex flex-col items-center">
-            <span className={`text-xs mb-2 ${mutedLight} ${mutedDark}`}>底</span>
+        <h3 className="text-sm font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">底台設定</h3>
+        <div className="flex items-end justify-center gap-4 sm:gap-8">
+          <div className="flex flex-col items-center flex-1 max-w-[7rem]">
+            <label className={`text-[10px] font-medium uppercase tracking-widest mb-2 w-full text-center ${mutedLight} ${mutedDark}`}>底（元）</label>
             <input
               type="number"
               value={base}
               onChange={(e) => setBase(parseInt(e.target.value) || 0)}
-              className={`bg-transparent text-3xl font-bold text-center w-20 border-b-2 outline-none ${primaryBorder} ${cardDark}`}
+              onFocus={(e) => e.target.select()}
+              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
             />
           </div>
-          <div className="text-gray-300 dark:text-[#2d302d] text-4xl">/</div>
-          <div className="flex flex-col items-center">
-            <span className={`text-xs mb-2 ${mutedLight} ${mutedDark}`}>台</span>
+          <span className={`text-2xl font-bold pb-2 ${mutedLight} ${mutedDark}`}>/</span>
+          <div className="flex flex-col items-center flex-1 max-w-[7rem]">
+            <label className={`text-[10px] font-medium uppercase tracking-widest mb-2 w-full text-center ${mutedLight} ${mutedDark}`}>每台（元）</label>
             <input
               type="number"
               value={pointPrice}
               onChange={(e) => setPointPrice(parseInt(e.target.value) || 0)}
-              className={`bg-transparent text-3xl font-bold text-center w-20 border-b-2 outline-none ${primaryBorder} ${cardDark}`}
+              onFocus={(e) => e.target.select()}
+              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
             />
           </div>
         </div>
@@ -241,30 +244,69 @@ const App = () => {
 
   const RecordView = () => (
     <div className="space-y-8">
-      <section className={`${cardCls} ${cardLight} ${cardDark} p-8 text-center`}>
+      <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
         <p className={`${sectionLabel} mb-4 ${mutedLight} ${mutedDark}`}>手動記帳</p>
-        <div className="relative mb-6">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-400 dark:text-[#4a5a4a]">$</span>
-          <input
-            type="number"
-            placeholder="0"
-            value={manualAmount}
-            onChange={(e) => setManualAmount(e.target.value)}
-            className={`w-full rounded-2xl p-5 pl-12 text-4xl font-bold outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => setManualAmount(prev => prev ? `-${Math.abs(parseInt(prev))}` : '-')}
-            className={`p-4 rounded-xl border font-bold ${cardLight} ${cardDark} border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark}`}
-          >
-            支出 (-)
-          </button>
+
+        <div className="space-y-4">
+          <div>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>金額</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400 dark:text-[#4a5a4a]">$</span>
+              <input
+                type="number"
+                min={1}
+                placeholder="0"
+                value={manualAmount}
+                onChange={(e) => setManualAmount(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                className={`w-full rounded-xl p-4 pl-10 text-2xl font-bold outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>類型</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setManualType('win')}
+                className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                  manualType === 'win'
+                    ? 'bg-secondary border-secondary text-white shadow-md'
+                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                }`}
+              >
+                贏錢
+              </button>
+              <button
+                type="button"
+                onClick={() => setManualType('expense')}
+                className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+                  manualType === 'expense'
+                    ? 'bg-primary border-primary text-white shadow-md'
+                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                }`}
+              >
+                支出
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
+            <input
+              type="text"
+              placeholder="例：昨晚牌局、請客..."
+              value={manualNote}
+              onChange={(e) => setManualNote(e.target.value)}
+              className={`w-full rounded-xl px-4 py-3 text-sm outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary placeholder:opacity-60`}
+            />
+          </div>
+
           <button
             type="button"
             onClick={addManualRecord}
-            className={`p-4 rounded-xl font-bold shadow-lg ${secondaryBg}`}
+            className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
           >
             新增紀錄
           </button>
@@ -280,29 +322,34 @@ const App = () => {
           <div className={`py-20 text-center italic ${mutedLight} ${mutedDark}`}>尚無數據</div>
         ) : (
           records.map(record => (
-            <div key={record.id} className={`${cardCls} ${cardLight} ${cardDark} p-4 flex justify-between items-center`}>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${record.amount >= 0 ? 'bg-secondary/20 text-secondary' : 'bg-primary/20 text-red-400 dark:text-[#ff8080]'}`}>
-                  {record.amount >= 0 ? <Plus size={16} /> : <Minus size={16} />}
+            <div key={record.id} className={`${cardCls} ${cardLight} ${cardDark} p-4`}>
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${record.amount >= 0 ? 'bg-secondary/20 text-secondary' : 'bg-primary/20 text-red-400 dark:text-[#ff8080]'}`}>
+                    {record.amount >= 0 ? <Plus size={16} /> : <Minus size={16} />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold">{record.amount >= 0 ? '贏錢' : '支出'}</p>
+                    <p className={`text-[10px] ${mutedLight} ${mutedDark}`}>
+                      {record.date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })} · {record.date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {record.note && (
+                      <p className="text-xs mt-1 text-gray-600 dark:text-[#a0a0a0] truncate" title={record.note}>{record.note}</p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold">{record.amount >= 0 ? '贏家結算' : '支付損失'}</p>
-                  <p className={`text-[10px] ${mutedLight} ${mutedDark}`}>
-                    {record.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="text-right shrink-0">
+                  <p className={`text-lg font-bold tabular-nums ${record.amount >= 0 ? 'text-secondary' : 'text-red-400 dark:text-[#ff8080]'}`}>
+                    {record.amount >= 0 ? `+${record.amount}` : record.amount}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setRecords(records.filter(r => r.id !== record.id))}
+                    className={`text-[10px] mt-1 ${mutedLight} ${mutedDark} hover:text-primary transition-colors`}
+                  >
+                    刪除
+                  </button>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-lg font-bold ${record.amount >= 0 ? 'text-secondary' : 'text-red-400 dark:text-[#ff8080]'}`}>
-                  {record.amount >= 0 ? `+${record.amount}` : record.amount}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setRecords(records.filter(r => r.id !== record.id))}
-                  className={`text-[10px] ${mutedLight} ${mutedDark} hover:text-primary transition-colors`}
-                >
-                  刪除
-                </button>
               </div>
             </div>
           ))
@@ -469,7 +516,7 @@ const App = () => {
               </div>
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-gray-900 dark:text-[#e0e0e0]">
+              <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-[#e0e0e0]">
                 麻將算算 <span className="text-primary">MahjongCalc</span>
               </h1>
             </div>
