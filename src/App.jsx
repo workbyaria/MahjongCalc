@@ -245,28 +245,31 @@ const App = () => {
   const RecordView = () => (
     <div className="space-y-8">
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <p className={`${sectionLabel} mb-4 ${mutedLight} ${mutedDark}`}>手動記帳</p>
+        <h3 className="text-base font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">本局戰績</h3>
 
-        <div className="space-y-4">
+        <div className="space-y-4 text-center">
           <div>
             <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>金額</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400 dark:text-[#4a5a4a]">$</span>
               <input
-                type="number"
-                min={1}
+                type="text"
+                inputMode="numeric"
                 placeholder="0"
                 value={manualAmount}
-                onChange={(e) => setManualAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setManualAmount(v);
+                }}
                 onFocus={(e) => e.target.select()}
-                className={`w-full rounded-xl p-4 pl-10 text-2xl font-bold outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
+                className={`w-full rounded-xl p-4 pl-10 text-2xl font-bold text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
               />
             </div>
           </div>
 
           <div>
             <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>類型</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
               <button
                 type="button"
                 onClick={() => setManualType('win')}
@@ -299,14 +302,14 @@ const App = () => {
               placeholder="例：昨晚牌局、請客..."
               value={manualNote}
               onChange={(e) => setManualNote(e.target.value)}
-              className={`w-full rounded-xl px-4 py-3 text-sm outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary placeholder:opacity-60`}
+              className={`w-full rounded-xl px-4 py-3 text-sm text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary placeholder:opacity-60`}
             />
           </div>
 
           <button
             type="button"
             onClick={addManualRecord}
-            className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
+            className={`w-full max-w-xs mx-auto block py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
           >
             新增紀錄
           </button>
@@ -366,13 +369,13 @@ const App = () => {
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
             <p className={`${sectionLabel} mb-1 ${mutedLight} ${mutedDark}`}>Total P/L</p>
             <p className={`text-2xl font-bold ${stats.total >= 0 ? 'text-secondary' : 'text-red-500 dark:text-[#ff8080]'}`}>
               ${stats.total}
             </p>
           </div>
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
             <p className={`${sectionLabel} mb-1 ${mutedLight} ${mutedDark}`}>Win Rate</p>
             <p className="text-2xl font-bold">
               {stats.totalCount ? Math.round((stats.winCount / stats.totalCount) * 100) : 0}%
