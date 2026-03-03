@@ -30,7 +30,7 @@ const DEFAULT_POINT_RULES = [
   { id: 'gshk', name: '槓上開花', pts: 2, cat: 'Big' },
 ];
 
-const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark', records: 'mahjong_records' };
+const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark', records: 'mahjong_records', base: 'mahjong_base', pointPrice: 'mahjong_point_price' };
 
 // 手動紀錄表單：漏記、流局或非台數結算時可在此新增，用本地 state 管理輸入；字級與計算頁一致
 const recordFormTitle = 'text-base font-bold text-gray-800 dark:text-[#ececec]';
@@ -224,8 +224,26 @@ const SettingsView = ({
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('calc');
-  const [base, setBase] = useState(0);
-  const [pointPrice, setPointPrice] = useState(0);
+  const [base, setBase] = useState(() => {
+    try {
+      const v = localStorage.getItem(STORAGE_KEYS.base);
+      if (v != null) return Math.max(0, parseInt(v, 10) || 0);
+    } catch (_) {}
+    return 0;
+  });
+  const [pointPrice, setPointPrice] = useState(() => {
+    try {
+      const v = localStorage.getItem(STORAGE_KEYS.pointPrice);
+      if (v != null) return Math.max(0, parseInt(v, 10) || 0);
+    } catch (_) {}
+    return 0;
+  });
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.base, String(base));
+  }, [base]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.pointPrice, String(pointPrice));
+  }, [pointPrice]);
   const [extraPoints, setExtraPoints] = useState(0);
   const [selectedPoints, setSelectedPoints] = useState({});
   const [records, setRecords] = useState(() => {
