@@ -642,7 +642,7 @@ const App = () => {
             >
               完成本次結算
             </button>
-            <p className={`text-[11px] ${mutedLight} ${mutedDark}`}>以上為本次未結算金額；完成結算後本區歸零，歷史紀錄與報表仍會保留。</p>
+            <p className={`text-[11px] ${mutedLight} ${mutedDark}`}>完成結算後本區歸零，歷史紀錄與報表仍會保留</p>
           </>
         )}
       </section>
