@@ -879,7 +879,7 @@ const App = () => {
               <button
                 type="button"
                 onClick={addRecordFromCalc}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 bg-white/95 dark:bg-[#1a1c1a] text-primary font-semibold text-xs hover:bg-white dark:hover:bg-[#2a2c2a] active:scale-[0.98] transition-all shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3 py-3 bg-white/95 dark:bg-[#e0e4e0] text-primary font-semibold text-xs hover:bg-white dark:hover:bg-[#e8ece8] active:scale-[0.98] transition-all shrink-0"
                 title="以目前總金額新增紀錄"
               >
                 <CheckCircle2 size={16} strokeWidth={2.2} />
