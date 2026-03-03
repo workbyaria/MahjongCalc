@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark 模式：主色與次要色略為調亮，提升可讀性 */
+:root {
+  --color-primary: #8c2a2a;
+  --color-secondary: #2d5a4a;
+}
+.dark {
+  --color-primary: #a83a3a;
+  --color-secondary: #3d7a62;
+}
+
 /* 數字輸入框隱藏上下箭頭 */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

@@ -8,11 +8,13 @@ import {
   CheckCircle2, 
   Settings,
   Calendar,
+  Clock,
   Save,
   RotateCcw,
   ArrowLeft,
   Instagram,
-  Mail
+  Mail,
+  Trash2
 } from 'lucide-react';
 
 const DEFAULT_POINT_RULES = [
@@ -20,15 +22,20 @@ const DEFAULT_POINT_RULES = [
   { id: 'lian1', name: '連一', pts: 2, cat: 'Basic' },
   { id: 'zimo', name: '自摸', pts: 1, cat: 'Basic' },
   { id: 'mq', name: '門清', pts: 1, cat: 'Basic' },
+  { id: 'mqzm', name: '門清自摸', pts: 3, cat: 'Basic' },
   { id: 'pph', name: '碰碰胡', pts: 4, cat: 'Big' },
   { id: 'ph', name: '平胡', pts: 2, cat: 'Big' },
   { id: 'qys', name: '清一色', pts: 8, cat: 'Big' },
   { id: 'hys', name: '混一色', pts: 4, cat: 'Big' },
+  { id: 'gshk', name: '槓上開花', pts: 2, cat: 'Big' },
 ];
 
-const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark' };
+const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark', records: 'mahjong_records' };
 
-// 本局戰績表單：用本地 state 管理輸入，避免父層 re-render 導致金額被清掉
+// 手動紀錄表單：漏記、流局或非台數結算時可在此新增，用本地 state 管理輸入；字級與計算頁一致
+const recordFormTitle = 'text-base font-bold text-gray-800 dark:text-[#ececec]';
+const recordFormLabel = 'text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#c0c8c0]';
+
 const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mutedDark, inputLight, inputDark, secondaryBg }) => {
   const [amount, setAmount] = useState('');
   const [type, setType] = useState('win');
@@ -44,10 +51,11 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
 
   return (
     <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-      <h3 className="text-base font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">本局戰績</h3>
-      <div className="space-y-4 text-center">
+      <h3 className={`${recordFormTitle} mb-2 text-center`}>手動紀錄</h3>
+      <p className={`text-xs text-center ${mutedLight} ${mutedDark} mb-5`}>漏記、備註、非台數結算時可在此新增</p>
+      <div className="space-y-5 text-center">
         <div>
-          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>金額</label>
+          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>金額</label>
           <input
             type="text"
             inputMode="numeric"
@@ -55,16 +63,16 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
             onFocus={(e) => e.target.select()}
-            className={`w-full rounded-xl p-4 text-2xl font-bold text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
+            className={`w-full rounded-xl p-4 text-2xl font-black text-center outline-none border transition-all ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary`}
           />
         </div>
         <div>
-          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>類型</label>
+          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>類型</label>
           <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
             <button
               type="button"
               onClick={() => setType('win')}
-              className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+              className={`py-3.5 rounded-xl font-semibold text-sm transition-all border ${
                 type === 'win'
                   ? 'bg-secondary border-secondary text-white shadow-md'
                   : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
@@ -75,18 +83,18 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
             <button
               type="button"
               onClick={() => setType('expense')}
-              className={`py-3 rounded-xl font-bold text-sm transition-all border ${
+              className={`py-3.5 rounded-xl font-semibold text-sm transition-all border ${
                 type === 'expense'
                   ? 'bg-primary border-primary text-white shadow-md'
                   : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
               }`}
             >
-              支出
+              輸錢
             </button>
           </div>
         </div>
         <div>
-          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
+          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
           <input
             type="text"
             placeholder="例：昨晚牌局、請客..."
@@ -98,22 +106,142 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
         <button
           type="button"
           onClick={handleSubmit}
-          className={`w-full max-w-xs mx-auto block py-3.5 rounded-xl font-bold text-sm shadow-md ${secondaryBg}`}
+          className={`w-full max-w-xs mx-auto block py-3.5 rounded-xl font-semibold text-sm shadow-md ${secondaryBg}`}
         >
-          新增紀錄
+          確認新增
         </button>
       </div>
     </section>
   );
 };
 
+// 台數規則設定：用本地 state 管理編輯中規則，避免輸入時父層 re-render 導致跳掉
+const SettingsView = ({
+  initialRules,
+  defaultRules,
+  onSave,
+  onClose,
+  cardCls,
+  cardLight,
+  cardDark,
+  sectionLabel,
+  mutedLight,
+  mutedDark,
+  inputLight,
+  inputDark,
+}) => {
+  const [editingRules, setEditingRules] = useState(() => initialRules.map(r => ({ ...r })));
+
+  const updateRule = (index, field, value) => {
+    setEditingRules(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = {
+        ...next[index],
+        [field]: field === 'pts' ? (parseInt(String(value).replace(/\D/g, ''), 10) || 0) : value,
+      };
+      return next;
+    });
+  };
+
+  const addNewRule = () => {
+    setEditingRules(prev => [...prev, { id: `rule_${Date.now()}`, name: '', pts: 0, cat: 'Custom' }]);
+  };
+
+  const removeRule = (index) => {
+    setEditingRules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = () => {
+    onSave(editingRules);
+  };
+
+  const handleReset = () => {
+    setEditingRules(defaultRules.map(r => ({ ...r })));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#F7F4EF] dark:bg-[#0a0c0a] text-gray-900 dark:text-[#ececec]">
+      <header className="flex-none sticky top-0 z-10 w-full bg-[#F7F4EF] dark:bg-[#0a0c0a] border-b border-gray-200 dark:border-[#1a1c1a] shadow-sm">
+        <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
+          <button type="button" onClick={onClose} className="p-2 -ml-1 rounded-xl text-gray-600 dark:text-[#d0d4d0] hover:bg-gray-100 dark:hover:bg-[#1a1c1a] transition-colors shrink-0">
+            <ArrowLeft size={22} strokeWidth={2} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-semibold tracking-tight">台數規則</h1>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={handleReset} className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold border border-gray-200 dark:border-[#2d302d] text-gray-600 dark:text-[#d0d4d0] bg-white dark:bg-[#1a1c1a] hover:border-gray-300 dark:hover:border-[#4a5a4a] transition-colors">
+              <RotateCcw size={16} /> 還原預設
+            </button>
+            <button type="button" onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-white bg-primary hover:opacity-90 transition-opacity">
+              <Save size={16} /> 儲存
+            </button>
+          </div>
+        </div>
+      </header>
+      <div className="flex-1 overflow-y-auto w-full">
+        <div className="max-w-md mx-auto px-4 py-6 space-y-8">
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 px-1">
+              <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>規則列表</span>
+              <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
+            </div>
+            <div className={`${cardCls} ${cardLight} ${cardDark} overflow-hidden`}>
+              {editingRules.map((rule, index) => (
+                <div key={rule.id} className={`flex flex-row items-center gap-2 p-3 ${index < editingRules.length - 1 ? 'border-b border-gray-100 dark:border-[#2d302d]' : ''}`}>
+                  <input
+                    type="text"
+                    value={rule.name}
+                    onChange={(e) => updateRule(index, 'name', e.target.value)}
+                    className={`flex-1 min-w-0 rounded-lg border px-3 py-2.5 outline-none transition-colors ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary text-sm font-medium`}
+                    placeholder="名稱"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={rule.pts}
+                    onChange={(e) => updateRule(index, 'pts', e.target.value)}
+                    className={`w-16 rounded-lg border px-2 py-2.5 text-center outline-none transition-colors ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary text-sm font-bold`}
+                    placeholder="台"
+                  />
+                  <button type="button" onClick={() => removeRule(index)} className={`p-2 rounded-lg shrink-0 ${mutedLight} ${mutedDark} hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors`} aria-label="刪除此規則">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={addNewRule} className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-300 dark:border-[#3d403d] ${mutedLight} ${mutedDark} hover:border-primary hover:text-primary dark:hover:text-primary transition-colors`}>
+              <Plus size={18} /> 新增規則
+            </button>
+            <p className={`text-[10px] text-center ${mutedLight} ${mutedDark}`}>儲存後將依序套用至計算頁</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
   const [activeTab, setActiveTab] = useState('calc');
-  const [base, setBase] = useState(30);
-  const [pointPrice, setPointPrice] = useState(10);
+  const [base, setBase] = useState(0);
+  const [pointPrice, setPointPrice] = useState(0);
   const [extraPoints, setExtraPoints] = useState(0);
   const [selectedPoints, setSelectedPoints] = useState({});
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.records);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(r => ({ ...r, date: r.date ? new Date(r.date) : new Date(), settledAt: r.settledAt ?? null }));
+    } catch (_) { return []; }
+  });
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.records, JSON.stringify(records));
+  }, [records]);
+  const [resultPosition, setResultPosition] = useState(null); // '上家'|'下家'|'對家'|'自摸'|null
+  const [resultType, setResultType] = useState('win');        // 'win'|'expense'
   const [showToast, setShowToast] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isDark, setIsDark] = useState(() => {
@@ -131,16 +259,10 @@ const App = () => {
     } catch (_) {}
     return DEFAULT_POINT_RULES.map(r => ({ ...r }));
   });
-  const [editingRules, setEditingRules] = useState([]);
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
     localStorage.setItem(STORAGE_KEYS.isDark, JSON.stringify(isDark));
   }, [isDark]);
-
-  useEffect(() => {
-    if (showSettings) setEditingRules(pointRules.map(r => ({ ...r })));
-  }, [showSettings, pointRules]);
 
   const currentTotalPoints = useMemo(() => {
     let pts = extraPoints;
@@ -159,17 +281,28 @@ const App = () => {
     setSelectedPoints(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const addManualRecord = (amountNum, type, note) => {
-    if (!amountNum || amountNum <= 0) return;
+  const addManualRecord = (amountNum, type, note, extra = {}) => {
+    const num = typeof amountNum === 'number' ? amountNum : parseInt(amountNum, 10);
+    if (num == null || isNaN(num)) return;
     const newRecord = {
       id: Date.now(),
-      amount: type === 'win' ? amountNum : -amountNum,
+      amount: type === 'win' ? Math.abs(num) : -Math.abs(num),
       date: new Date(),
       type: type === 'win' ? 'win' : 'loss',
-      note: (note && note.trim()) || undefined
+      note: (note && note.trim()) || undefined,
+      ...(extra.position != null && { position: extra.position }),
+      ...(extra.points != null && Number.isInteger(extra.points) && { points: extra.points })
     };
     setRecords(prev => [newRecord, ...prev]);
     triggerToast();
+  };
+
+  const addRecordFromCalc = () => {
+    const amount = resultType === 'win' ? currentTotalAmount : -currentTotalAmount;
+    addManualRecord(Math.abs(amount), resultType, undefined, {
+      position: resultPosition ?? undefined,
+      points: currentTotalPoints
+    });
   };
 
   const triggerToast = () => {
@@ -177,31 +310,77 @@ const App = () => {
     setTimeout(() => setShowToast(false), 2000);
   };
 
-  const savePointRules = () => {
-    const valid = editingRules.filter(r => r.name?.trim() && Number.isInteger(r.pts) && r.pts >= 0);
+  const handleSavePointRules = (rules) => {
+    const valid = rules.filter(r => r.name?.trim() && Number.isInteger(r.pts) && r.pts >= 0);
     setPointRules(valid.length ? valid : DEFAULT_POINT_RULES.map(r => ({ ...r })));
     localStorage.setItem(STORAGE_KEYS.pointRules, JSON.stringify(valid.length ? valid : DEFAULT_POINT_RULES));
     setShowSettings(false);
     triggerToast();
   };
 
-  const resetPointRules = () => {
-    setEditingRules(DEFAULT_POINT_RULES.map(r => ({ ...r })));
-  };
-
-  const updateEditingRule = (index, field, value) => {
-    setEditingRules(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = { ...next[index], [field]: field === 'pts' ? (parseInt(value, 10) || 0) : value };
-      return next;
-    });
-  };
-
   const stats = useMemo(() => {
     const total = records.reduce((acc, cur) => acc + cur.amount, 0);
     const winCount = records.filter(r => r.amount > 0).length;
-    return { total, winCount, totalCount: records.length };
+    const wins = records.filter(r => r.amount > 0).map(r => r.amount);
+    const losses = records.filter(r => r.amount < 0).map(r => r.amount);
+    const maxWin = wins.length ? Math.max(...wins) : 0;
+    const maxLoss = losses.length ? Math.min(...losses) : 0;
+    return { total, winCount, totalCount: records.length, maxWin, maxLoss };
+  }, [records]);
+
+  // 依對象（上家/下家/對家）自動加總：只計「未結算」的紀錄。正數＝他要給你，負數＝你要給他。
+  const positionSums = useMemo(() => {
+    const pos = { 上家: 0, 下家: 0, 對家: 0 };
+    records.filter(r => !r.settledAt).forEach(r => {
+      if (!r.position) return;
+      if (r.position === '自摸') {
+        if (r.amount <= 0) return;
+        pos.上家 += r.amount;
+        pos.下家 += r.amount;
+        pos.對家 += r.amount;
+      } else if (pos.hasOwnProperty(r.position)) {
+        pos[r.position] += r.amount;
+      }
+    });
+    return pos;
+  }, [records]);
+
+  const hasUnsettled = records.some(r => !r.settledAt);
+  const handleCompleteSettlement = () => {
+    if (!window.confirm('確定完成本次結算？依對象結算將歸零，歷史紀錄與報表仍會保留。')) return;
+    setRecords(prev => prev.map(r => ({ ...r, settledAt: r.settledAt ?? Date.now() })));
+    triggerToast();
+  };
+
+  // 從紀錄時間計算：今天／本月 打牌時長（首筆到末筆的時間跨度）
+  const durationStats = useMemo(() => {
+    const toDate = (r) => {
+      const d = r.date;
+      return d instanceof Date ? d : new Date(d);
+    };
+    const now = new Date();
+    const isToday = (d) => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    const isThisMonth = (d) => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    const getDurationParts = (ms) => {
+      if (ms <= 0) return null;
+      const totalMins = Math.floor(ms / 60000);
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return { h, m };
+    };
+    const todayRecords = records.filter(r => isToday(toDate(r)));
+    const monthRecords = records.filter(r => isThisMonth(toDate(r)));
+    const span = (arr) => {
+      if (arr.length < 2) return 0;
+      const dates = arr.map(r => toDate(r).getTime());
+      return Math.max(...dates) - Math.min(...dates);
+    };
+    return {
+      todayParts: getDurationParts(span(todayRecords)),
+      todayCount: todayRecords.length,
+      monthParts: getDurationParts(span(monthRecords)),
+      monthCount: monthRecords.length
+    };
   }, [records]);
 
   // 依時段打招呼 + 幽默短句（每次進入依當下時段選一句）
@@ -223,39 +402,45 @@ const App = () => {
   // 參考截圖：圓角卡片、輕陰影、區塊標題
   const cardCls = 'rounded-3xl border transition-colors ';
   const cardLight = 'bg-white border-gray-100 text-gray-800 shadow-[0_2px_12px_rgba(0,0,0,0.06)]';
-  const cardDark = 'dark:bg-[#1a1c1a] dark:border-[#2d302d] dark:text-[#e0e0e0] dark:shadow-[0_2px_16px_rgba(0,0,0,0.3)]';
+  const cardDark = 'dark:bg-[#1a1c1a] dark:border-[#2d302d] dark:text-[#ececec] dark:shadow-[0_2px_16px_rgba(0,0,0,0.3)]';
   const inputLight = 'bg-[#FAFAF9] border-gray-200 text-gray-900 placeholder-gray-400';
-  const inputDark = 'dark:bg-[#0a0c0a] dark:border-[#2d302d] dark:text-[#e0e0e0] dark:placeholder-[#4a5a4a]';
+  const inputDark = 'dark:bg-[#0a0c0a] dark:border-[#2d302d] dark:text-[#ececec] dark:placeholder-[#b8c4b8]';
   const mutedLight = 'text-gray-500';
-  const mutedDark = 'dark:text-[#6a7a6a]';
+  const mutedDark = 'dark:text-[#c0c8c0]';
   const sectionLabel = 'text-[10px] font-bold uppercase tracking-[0.2em]';
   const primaryBorder = 'border-primary focus:border-primary dark:border-primary';
   const secondaryBg = 'bg-secondary text-white hover:opacity-90';
 
+  // 計算頁統一字級：區塊標題 / 欄位標籤 / 按鈕內文
+  const calcSectionTitle = 'text-base font-bold text-gray-800 dark:text-[#ececec]';
+  const calcLabel = `text-xs font-semibold uppercase tracking-wider ${mutedLight} ${mutedDark}`;
+  const calcRuleText = 'text-sm font-medium';
+  const calcRulePts = 'text-sm font-medium';
+
   const CalcView = () => (
     <div className="space-y-8">
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <h3 className="text-sm font-bold text-gray-800 dark:text-[#e0e0e0] mb-5 text-center">底台設定</h3>
+        <h3 className={`${calcSectionTitle} mb-5 text-center`}>底台設定</h3>
         <div className="flex items-end justify-center gap-4 sm:gap-8">
           <div className="flex flex-col items-center flex-1 max-w-[7rem]">
-            <label className={`text-[10px] font-medium uppercase tracking-widest mb-2 w-full text-center ${mutedLight} ${mutedDark}`}>底（元）</label>
+            <label className={`${calcLabel} mb-2.5 w-full text-center`}>底（元）</label>
             <input
               type="number"
               value={base}
               onChange={(e) => setBase(parseInt(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
+              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3.5 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
             />
           </div>
           <span className={`text-2xl font-bold pb-2 ${mutedLight} ${mutedDark}`}>/</span>
           <div className="flex flex-col items-center flex-1 max-w-[7rem]">
-            <label className={`text-[10px] font-medium uppercase tracking-widest mb-2 w-full text-center ${mutedLight} ${mutedDark}`}>每台（元）</label>
+            <label className={`${calcLabel} mb-2.5 w-full text-center`}>每台（元）</label>
             <input
               type="number"
               value={pointPrice}
               onChange={(e) => setPointPrice(parseInt(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
+              className={`w-full bg-gray-50 dark:bg-[#0f110f] rounded-xl py-3.5 text-2xl font-black text-center border outline-none transition-colors ${primaryBorder} ${cardDark} focus:ring-2 focus:ring-primary/20`}
             />
           </div>
         </div>
@@ -263,7 +448,7 @@ const App = () => {
 
       <section className="space-y-4">
         <div className="flex items-center gap-3 px-1">
-          <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>台數選擇</span>
+          <span className={calcLabel}>台數選擇</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -271,14 +456,14 @@ const App = () => {
             <button
               key={rule.id}
               onClick={() => togglePoint(rule.id)}
-              className={`p-4 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 border ${
+              className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 border ${
                 selectedPoints[rule.id]
                   ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20'
-                  : `bg-white dark:bg-[#1a1c1a] border-gray-200 dark:border-[#2d302d] text-gray-700 dark:text-[#a0a0a0] hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                  : `bg-white dark:bg-[#1a1c1a] border-gray-200 dark:border-[#2d302d] text-gray-700 dark:text-[#d0d4d0] hover:border-gray-300 dark:hover:border-[#4a5a4a]`
               }`}
             >
-              <span className="text-sm font-medium">{rule.name}</span>
-              <span className={`text-[10px] mt-1 ${selectedPoints[rule.id] ? 'text-white/80' : mutedLight + ' ' + mutedDark}`}>
+              <span className={calcRuleText}>{rule.name}</span>
+              <span className={`${calcRulePts} ${selectedPoints[rule.id] ? 'text-white/90' : mutedLight + ' ' + mutedDark}`}>
                 +{rule.pts} 台
               </span>
             </button>
@@ -288,15 +473,12 @@ const App = () => {
 
       {/* 額外加台：數字固定寬度避免按 +/- 時版面跳動 */}
       <section className={`${cardCls} ${cardLight} ${cardDark} p-5 flex justify-between items-center`}>
-        <div>
-          <p className="font-bold text-sm">額外加台</p>
-          <p className={`text-[10px] ${mutedLight} ${mutedDark}`}>Other custom points</p>
-        </div>
+        <p className={`${calcSectionTitle} text-left`}>額外加台</p>
         <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#0a0c0a] p-1 rounded-xl min-w-[120px] justify-center">
           <button
             type="button"
             onClick={() => setExtraPoints(Math.max(0, extraPoints - 1))}
-            className="w-10 h-10 rounded-lg bg-white dark:bg-[#2d302d] flex items-center justify-center text-gray-600 dark:text-[#a0a0a0] border border-gray-200 dark:border-[#2d302d] shrink-0"
+            className="w-10 h-10 rounded-lg bg-white dark:bg-[#2d302d] flex items-center justify-center text-gray-600 dark:text-[#d0d4d0] border border-gray-200 dark:border-[#2d302d] shrink-0"
           >
             <Minus size={18} />
           </button>
@@ -310,6 +492,59 @@ const App = () => {
           >
             <Plus size={18} />
           </button>
+        </div>
+      </section>
+
+      {/* 本手結果：贏錢＝上家/下家/對家/自摸；輸錢＝上家/下家/對家（付給誰） */}
+      <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
+        <h3 className={`${calcSectionTitle} mb-5 text-center`}>本手結果</h3>
+        <div className="space-y-5">
+          <div>
+            <label className={`block ${calcLabel} mb-2.5 text-center`}>對象</label>
+            <div className={`grid gap-2 ${resultType === 'win' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {(resultType === 'win' ? ['上家', '下家', '對家', '自摸'] : ['上家', '下家', '對家']).map(pos => (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => setResultPosition(pos)}
+                  className={`py-3 rounded-xl text-sm font-semibold transition-all border ${
+                    resultPosition === pos
+                      ? 'bg-primary border-primary text-white shadow-md'
+                      : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className={`block ${calcLabel} mb-2.5 text-center`}>輸贏</label>
+            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+              <button
+                type="button"
+                onClick={() => setResultType('win')}
+                className={`py-3.5 rounded-xl font-semibold text-sm transition-all border ${
+                  resultType === 'win'
+                    ? 'bg-secondary border-secondary text-white shadow-md'
+                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                }`}
+              >
+                贏錢
+              </button>
+              <button
+                type="button"
+                onClick={() => { setResultType('expense'); if (resultPosition === '自摸') setResultPosition(null); }}
+                className={`py-3.5 rounded-xl font-semibold text-sm transition-all border ${
+                  resultType === 'expense'
+                    ? 'bg-primary border-primary text-white shadow-md'
+                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                }`}
+              >
+                輸錢
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -329,13 +564,22 @@ const App = () => {
         secondaryBg={secondaryBg}
       />
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-center gap-3 px-1">
-          <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>最近紀錄</span>
+          <span className={`${calcLabel}`}>歷史紀錄</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
+          {records.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { if (window.confirm('確定要清除全部紀錄嗎？')) { setRecords([]); triggerToast(); } }}
+              className={`text-xs font-medium shrink-0 ${mutedLight} ${mutedDark} hover:text-red-500 dark:hover:text-[#ff8080] transition-colors`}
+            >
+              清除紀錄
+            </button>
+          )}
         </div>
         {records.length === 0 ? (
-          <div className={`py-20 text-center italic ${mutedLight} ${mutedDark}`}>尚無數據</div>
+          <div className={`py-20 text-center text-sm italic ${mutedLight} ${mutedDark}`}>尚無數據</div>
         ) : (
           records.map(record => (
             <div key={record.id} className={`${cardCls} ${cardLight} ${cardDark} p-4`}>
@@ -345,23 +589,29 @@ const App = () => {
                     {record.amount >= 0 ? <Plus size={16} /> : <Minus size={16} />}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold">{record.amount >= 0 ? '贏錢' : '支出'}</p>
-                    <p className={`text-[10px] ${mutedLight} ${mutedDark}`}>
+                    <p className="text-sm font-semibold">{record.amount >= 0 ? '贏錢' : '輸錢'}</p>
+                    <p className={`text-xs mt-0.5 ${mutedLight} ${mutedDark}`}>
                       {record.date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })} · {record.date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                      {record.settledAt && <span className="ml-1.5 text-[10px] text-primary">已結算</span>}
                     </p>
+                    {(record.position || record.points != null) && (
+                      <p className={`text-xs mt-0.5 ${mutedLight} ${mutedDark}`}>
+                        {[record.position, record.points != null ? `${record.points} 台` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                     {record.note && (
-                      <p className="text-xs mt-1 text-gray-600 dark:text-[#a0a0a0] truncate" title={record.note}>{record.note}</p>
+                      <p className="text-xs mt-1 text-gray-600 dark:text-[#d0d4d0] truncate" title={record.note}>{record.note}</p>
                     )}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-lg font-bold tabular-nums ${record.amount >= 0 ? 'text-secondary' : 'text-red-400 dark:text-[#ff8080]'}`}>
+                  <p className={`text-lg font-semibold tabular-nums ${record.amount >= 0 ? 'text-secondary' : 'text-red-400 dark:text-[#ff8080]'}`}>
                     {record.amount >= 0 ? `+${record.amount}` : record.amount}
                   </p>
                   <button
                     type="button"
-                    onClick={() => setRecords(records.filter(r => r.id !== record.id))}
-                    className={`text-[10px] mt-1 ${mutedLight} ${mutedDark} hover:text-primary transition-colors`}
+                    onClick={() => setRecords(prev => prev.filter(r => r.id !== record.id))}
+                    className={`text-xs mt-1 font-medium ${mutedLight} ${mutedDark} hover:text-primary transition-colors`}
                   >
                     刪除
                   </button>
@@ -371,34 +621,115 @@ const App = () => {
           ))
         )}
       </section>
+
+      <section className={`${cardCls} ${cardLight} ${cardDark} p-6 space-y-4 text-center`}>
+        <h4 className={calcSectionTitle}>本次依對象結算</h4>
+        <p className={`text-xs ${mutedLight} ${mutedDark}`}>正數＝他要給你，負數＝你要給他</p>
+        {(['上家', '下家', '對家']).map(pos => (
+          <div key={pos} className="flex justify-center items-center gap-4">
+            <span className={`text-sm font-medium ${mutedLight} ${mutedDark}`}>{pos}</span>
+            <span className={`text-sm font-semibold tabular-nums ${positionSums[pos] > 0 ? 'text-secondary' : positionSums[pos] < 0 ? 'text-red-500 dark:text-[#ff8080]' : ''}`}>
+              {positionSums[pos] > 0 ? `+$${positionSums[pos].toLocaleString()}` : positionSums[pos] < 0 ? `-$${Math.abs(positionSums[pos]).toLocaleString()}` : '$0'}
+            </span>
+          </div>
+        ))}
+        {hasUnsettled && (
+          <>
+            <button
+              type="button"
+              onClick={handleCompleteSettlement}
+              className={`w-full mt-2 py-3 rounded-xl font-semibold text-sm border-2 border-dashed border-gray-300 dark:border-[#3d403d] ${mutedLight} ${mutedDark} hover:border-primary hover:text-primary transition-colors`}
+            >
+              完成本次結算
+            </button>
+            <p className={`text-[11px] ${mutedLight} ${mutedDark}`}>以上為本次未結算金額；完成結算後本區歸零，歷史紀錄與報表仍會保留。</p>
+          </>
+        )}
+      </section>
     </div>
   );
+
+  // 報表頁字級與計算/紀錄頁一致：區塊標題用 calcSectionTitle、標籤用 calcLabel
+  const reportCardValue = 'text-2xl font-semibold tabular-nums';
+  const reportCardSub = `text-xs ${mutedLight} ${mutedDark}`;
+  const reportRowLabel = `text-sm font-medium ${mutedLight} ${mutedDark}`;
+  const reportRowValue = 'text-sm font-semibold tabular-nums';
 
   const ReportView = () => (
     <div className="space-y-8">
       <section>
         <div className="flex items-center gap-3 px-1 mb-4">
-          <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>總覽</span>
+          <span className={calcLabel}>總覽</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
-            <p className={`${sectionLabel} mb-1 ${mutedLight} ${mutedDark}`}>Total P/L</p>
-            <p className={`text-2xl font-bold ${stats.total >= 0 ? 'text-secondary' : 'text-red-500 dark:text-[#ff8080]'}`}>
+            <p className={`text-sm font-semibold mb-2 ${mutedLight} ${mutedDark}`}>總輸贏</p>
+            <p className={`${reportCardValue} ${stats.total >= 0 ? 'text-secondary' : 'text-red-500 dark:text-[#ff8080]'}`}>
               ${stats.total}
             </p>
           </div>
           <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
-            <p className={`${sectionLabel} mb-1 ${mutedLight} ${mutedDark}`}>Win Rate</p>
-            <p className="text-2xl font-bold">
+            <p className={`text-sm font-semibold mb-2 ${mutedLight} ${mutedDark}`}>勝率</p>
+            <p className={reportCardValue}>
               {stats.totalCount ? Math.round((stats.winCount / stats.totalCount) * 100) : 0}%
             </p>
           </div>
         </div>
       </section>
 
+      <section>
+        <div className="flex items-center gap-3 px-1 mb-4">
+          <span className={calcLabel}>打牌時長</span>
+          <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 flex flex-col items-center justify-center text-center`}>
+            <Clock size={20} className={`mb-2 ${mutedLight} ${mutedDark}`} />
+            <p className={`${calcLabel} mb-2`}>今天打了多久</p>
+            <p className="text-gray-800 dark:text-[#ececec]">
+              {durationStats.todayParts == null ? (
+                '—'
+              ) : (
+                <>
+                  {durationStats.todayParts.h > 0 && (
+                    <><span className="text-base font-semibold tabular-nums">{durationStats.todayParts.h}</span><span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 小時 </span></>
+                  )}
+                  <span className="text-base font-semibold tabular-nums">{durationStats.todayParts.m}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 分鐘</span>
+                </>
+              )}
+            </p>
+            {durationStats.todayCount > 0 && (
+              <p className={`${reportCardSub} mt-1`}>{durationStats.todayCount} 手</p>
+            )}
+          </div>
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 flex flex-col items-center justify-center text-center`}>
+            <Clock size={20} className={`mb-2 ${mutedLight} ${mutedDark}`} />
+            <p className={`${calcLabel} mb-2`}>本月打了多久</p>
+            <p className="text-gray-800 dark:text-[#ececec]">
+              {durationStats.monthParts == null ? (
+                '—'
+              ) : (
+                <>
+                  {durationStats.monthParts.h > 0 && (
+                    <><span className="text-base font-semibold tabular-nums">{durationStats.monthParts.h}</span><span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 小時 </span></>
+                  )}
+                  <span className="text-base font-semibold tabular-nums">{durationStats.monthParts.m}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 分鐘</span>
+                </>
+              )}
+            </p>
+            {durationStats.monthCount > 0 && (
+              <p className={`${reportCardSub} mt-1`}>{durationStats.monthCount} 手</p>
+            )}
+          </div>
+        </div>
+        <p className={`mt-3 text-center ${reportCardSub}`}>依第一筆與最後一筆紀錄時間計算</p>
+      </section>
+
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+        <h4 className={`${calcSectionTitle} mb-4 flex items-center gap-2`}>
           <Calendar size={16} className="text-primary" />
           月度趨勢
         </h4>
@@ -409,121 +740,41 @@ const App = () => {
                 className={`w-full rounded-t-lg transition-all duration-500 ${i === 3 ? 'bg-primary' : 'bg-gray-200 dark:bg-[#2d302d]'}`}
                 style={{ height: `${h}%` }}
               />
-              <span className={`text-[8px] ${mutedLight} ${mutedDark}`}>{i + 1}月</span>
+              <span className={reportCardSub}>{i + 1}月</span>
             </div>
           ))}
         </div>
       </section>
 
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6 space-y-4`}>
-        <h4 className="text-sm font-bold">本年統計摘要</h4>
-        <div className="flex justify-between items-center text-sm">
-          <span className={mutedLight + ' ' + mutedDark}>總對局數</span>
-          <span className="font-mono">{stats.totalCount} 場</span>
+        <h4 className={calcSectionTitle}>本年統計摘要</h4>
+        <div className="flex justify-between items-center">
+          <span className={reportRowLabel}>紀錄手數</span>
+          <span className={reportRowValue}>{stats.totalCount} 手</span>
         </div>
-        <div className="flex justify-between items-center text-sm">
-          <span className={mutedLight + ' ' + mutedDark}>最高獲利</span>
-          <span className="text-secondary font-mono">+$2,450</span>
+        <div className="flex justify-between items-center">
+          <span className={reportRowLabel}>單手最高贏額</span>
+          <span className={`${reportRowValue} ${stats.maxWin > 0 ? 'text-secondary' : ''}`}>
+            +${stats.maxWin.toLocaleString()}
+          </span>
         </div>
-        <div className="flex justify-between items-center text-sm">
-          <span className={mutedLight + ' ' + mutedDark}>最大損失</span>
-          <span className="text-red-500 dark:text-[#ff8080] font-mono">-$1,200</span>
+        <div className="flex justify-between items-center">
+          <span className={reportRowLabel}>單手最高損失</span>
+          <span className={`${reportRowValue} ${stats.maxLoss < 0 ? 'text-red-500 dark:text-[#ff8080]' : ''}`}>
+            {stats.maxLoss < 0 ? `-$${Math.abs(stats.maxLoss).toLocaleString()}` : '$0'}
+          </span>
         </div>
+        <p className={`pt-2 border-t border-gray-100 dark:border-[#2d302d] ${reportCardSub}`}>
+          數據僅含已新增紀錄，流局未計入
+        </p>
       </section>
     </div>
   );
 
-  const SettingsView = () => (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F7F4EF] dark:bg-[#0a0c0a] text-gray-900 dark:text-[#e0e0e0]">
-      {/* 與首頁一致的 Header */}
-      <header className="flex-none sticky top-0 z-10 w-full bg-[#F7F4EF] dark:bg-[#0a0c0a] border-b border-gray-200 dark:border-[#1a1c1a] shadow-sm">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowSettings(false)}
-            className="p-2 -ml-1 rounded-xl text-gray-600 dark:text-[#a0a0a0] hover:bg-gray-100 dark:hover:bg-[#1a1c1a] transition-colors shrink-0"
-          >
-            <ArrowLeft size={22} strokeWidth={2} />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-black tracking-tight">台數規則</h1>
-            <p className={`text-[9px] font-semibold tracking-[0.2em] uppercase ${mutedLight} ${mutedDark}`}>Point Rules</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={resetPointRules}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold border border-gray-200 dark:border-[#2d302d] text-gray-600 dark:text-[#a0a0a0] bg-white dark:bg-[#1a1c1a] hover:border-gray-300 dark:hover:border-[#4a5a4a] transition-colors"
-            >
-              <RotateCcw size={16} />
-              還原預設
-            </button>
-            <button
-              type="button"
-              onClick={savePointRules}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-white bg-primary hover:opacity-90 transition-opacity shadow-md"
-            >
-              <Save size={16} />
-              儲存
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 與計算頁一致的卡片區塊 */}
-      <div className="flex-1 overflow-y-auto w-full">
-        <div className="max-w-md mx-auto px-4 py-6 space-y-8">
-          <section className="space-y-4">
-            <div className="flex items-center gap-3 px-1">
-              <span className={`${sectionLabel} ${mutedLight} ${mutedDark}`}>規則列表</span>
-              <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
-            </div>
-            <div className={`${cardCls} ${cardLight} ${cardDark} overflow-hidden`}>
-              {editingRules.map((rule, index) => (
-                <div
-                  key={rule.id}
-                  className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 sm:py-4 ${index < editingRules.length - 1 ? 'border-b border-gray-100 dark:border-[#2d302d]' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${mutedLight} ${mutedDark}`}>
-                      名稱
-                    </label>
-                    <input
-                      type="text"
-                      value={rule.name}
-                      onChange={(e) => updateEditingRule(index, 'name', e.target.value)}
-                      className={`w-full rounded-xl border px-4 py-3 outline-none transition-colors ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary text-sm font-medium`}
-                      placeholder="例：莊家"
-                    />
-                  </div>
-                  <div className="sm:w-24 shrink-0">
-                    <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${mutedLight} ${mutedDark}`}>
-                      台數
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={rule.pts}
-                      onChange={(e) => updateEditingRule(index, 'pts', e.target.value)}
-                      className={`w-full rounded-xl border px-3 py-3 text-center outline-none transition-colors ${inputLight} ${inputDark} border-gray-200 dark:border-[#2d302d] focus:border-primary text-sm font-bold`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className={`text-[10px] text-center ${mutedLight} ${mutedDark}`}>
-              儲存後將套用至計算頁
-            </p>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="h-screen flex flex-col bg-[#F7F4EF] dark:bg-[#0a0c0a] text-gray-900 dark:text-[#e0e0e0] overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#F7F4EF] dark:bg-[#0a0c0a] text-gray-900 dark:text-[#ececec] overflow-hidden">
       {/* ----- 固定頂部 Header (sticky) ----- */}
-      <header className="flex-none sticky top-0 z-40 w-full bg-[#F7F4EF] dark:bg-[#0a0c0a] border-b border-gray-200 dark:border-[#1a1c1a] shadow-sm">
+      <header className="flex-none sticky top-0 z-40 w-full bg-[#FBF9F6] dark:bg-[#0a0c0a] border-b border-gray-200 dark:border-[#1a1c1a]">
         <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white dark:bg-[#1a1c1a] rounded-2xl flex items-center justify-center border border-gray-100 dark:border-[#2d302d] shadow-sm">
@@ -532,19 +783,19 @@ const App = () => {
               </div>
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-[#e0e0e0]">
+              <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-[#ececec]">
                 麻將算算 <span className="text-primary">MahjongCalc</span>
               </h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Dark 模式：橢圓藥丸形、淺奶油底、深灰字、輕陰影 */}
+            {/* 淺色模式顯示 Dark、深色模式顯示 Light */}
             <button
               type="button"
               onClick={() => setIsDark(d => !d)}
               className="min-w-[4rem] px-4 py-2.5 rounded-[2rem] text-xs font-semibold transition-colors bg-[#F5F3F0] dark:bg-[#2a2c2a] text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-[#3d403d] shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:shadow-none"
             >
-              Dark
+              {isDark ? 'Light' : 'Dark'}
             </button>
             {/* 齒輪：正圓、淺奶油底、深灰圖示、輕陰影 */}
             <button
@@ -560,35 +811,47 @@ const App = () => {
 
       {/* ----- 可捲動主內容 (只有這裡會捲動) ----- */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden w-full">
-        <div className="max-w-md mx-auto px-4 py-6 pb-6">
+        <div className="max-w-md mx-auto px-4 py-6 pb-0">
           <p className={`text-sm font-medium mb-5 text-center ${mutedLight} ${mutedDark}`}>
             {greeting}
           </p>
-          {activeTab === 'calc' && <CalcView />}
-          {activeTab === 'record' && <RecordView />}
-          {activeTab === 'report' && <ReportView />}
+          {activeTab === 'calc' && CalcView()}
+          {activeTab === 'record' && RecordView()}
+          {activeTab === 'report' && ReportView()}
 
-          {/* 廣告、版權與社群：在 main 裡、footer 上方，會隨頁面捲動，不 sticky */}
-          <div className="mt-8 pt-6 pb-10 border-t border-gray-200 dark:border-[#2d302d]">
-            <div className="w-full rounded-2xl border border-dashed border-gray-300 dark:border-[#3d403d] bg-gray-50/80 dark:bg-[#1a1c1a]/80 min-h-[72px] flex items-center justify-center">
-              <span className={`text-xs font-medium ${mutedLight} ${mutedDark}`}>Ad</span>
+          {/* 廣告：在 main 裡會隨頁面捲動 */}
+          <div className="mt-8 pt-6 pb-4 border-t border-gray-200/80 dark:border-[#2d302d] flex flex-col">
+            <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-[#3d403d] bg-[#F5F3F0] dark:bg-[#1a1c1a]/90 min-h-[80px] flex items-center justify-center">
+              <span className="text-[11px] font-medium text-gray-400 dark:text-[#c0c8c0]">Ad</span>
             </div>
-            <p className={`mt-4 text-center text-[10px] ${mutedLight} ${mutedDark} tracking-wide`}>
-              Mahjong © {new Date().getFullYear()} · Friendly Cat Group
-            </p>
-            <div className="mt-2 flex items-center justify-center gap-4">
+          </div>
+
+          {/* 版權與 icon：貼近 footer、隨視窗滾動 */}
+          <div className="py-4 flex flex-col items-center justify-center gap-2">
+            <p className="text-center text-[11px] text-gray-600 dark:text-[#d0d4d0] tracking-wide">
+              MahjongCalc © 2026 ·{' '}
               <a
-                href="https://instagram.com"
+                href="https://www.friendlycatgroup.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`p-2 rounded-full ${mutedLight} ${mutedDark} hover:opacity-80 transition-opacity`}
-                aria-label="Instagram"
+                className="underline text-gray-600 dark:text-[#d0d4d0] hover:opacity-80 transition-opacity"
+              >
+                Friendly Cat Group
+              </a>
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <a
+                href="https://instagram.com/friendlycatgroup"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 text-gray-600 dark:text-[#d0d4d0] hover:opacity-80 transition-opacity"
+                aria-label="Instagram @friendlycatgroup"
               >
                 <Instagram size={18} strokeWidth={1.5} />
               </a>
               <a
-                href="mailto:hello@example.com"
-                className={`p-2 rounded-full ${mutedLight} ${mutedDark} hover:opacity-80 transition-opacity`}
+                href="mailto:workbyaria@gmail.com"
+                className="p-2 text-gray-600 dark:text-[#d0d4d0] hover:opacity-80 transition-opacity"
                 aria-label="Email"
               >
                 <Mail size={18} strokeWidth={1.5} />
@@ -599,18 +862,29 @@ const App = () => {
       </main>
 
       {/* ----- 固定底部 Footer (sticky)，僅導覽與計算結果欄 ----- */}
-      <footer className="flex-none sticky bottom-0 z-40 w-full bg-[#F7F4EF] dark:bg-[#0a0c0a] border-t border-gray-200 dark:border-[#2d302d] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
+      <footer className="flex-none sticky bottom-0 z-40 w-full bg-[#FBF9F6] dark:bg-[#0a0c0a] border-t border-gray-200 dark:border-[#1a1c1a]">
         <div className="max-w-md mx-auto flex flex-col items-center px-4 pt-4 pb-8">
           {activeTab === 'calc' && (
-            <div className="w-full max-w-[92%] bg-primary rounded-xl px-4 py-2.5 shadow-sm mb-3 flex items-center justify-between gap-4">
-              <span className="text-[10px] font-bold text-white/80 uppercase tracking-widest">
-                總計 <span className="tabular-nums">{currentTotalPoints}</span> 台
-              </span>
-              <div className="flex items-baseline gap-0.5 text-white">
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-1">總金額</span>
-                <span className="text-sm font-bold opacity-90">$</span>
-                <span className="text-xl font-black tabular-nums">{currentTotalAmount.toLocaleString()}</span>
+            <div className="w-full max-w-[92%] bg-primary rounded-xl shadow-sm mb-3 flex items-stretch gap-0 overflow-hidden">
+              <div className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-3">
+                <span className="text-xs font-semibold text-white/90">
+                  總計 <span className="tabular-nums font-bold">{currentTotalPoints}</span> 台
+                </span>
+                <div className="flex items-baseline gap-1 text-white">
+                  <span className="text-xs font-semibold text-white/90">總金額</span>
+                  <span className="text-sm font-bold ml-0.5">$</span>
+                  <span className="text-lg font-black tabular-nums ml-0.5">{currentTotalAmount.toLocaleString()}</span>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={addRecordFromCalc}
+                className="flex items-center justify-center gap-1.5 px-3 py-3 bg-white/95 dark:bg-[#1a1c1a] text-primary font-semibold text-xs hover:bg-white dark:hover:bg-[#2a2c2a] active:scale-[0.98] transition-all shrink-0"
+                title="以目前總金額新增紀錄"
+              >
+                <CheckCircle2 size={16} strokeWidth={2.2} />
+                新增紀錄
+              </button>
             </div>
           )}
 
@@ -651,7 +925,22 @@ const App = () => {
         </div>
       )}
 
-      {showSettings && <SettingsView />}
+      {showSettings && (
+        <SettingsView
+          initialRules={pointRules}
+          defaultRules={DEFAULT_POINT_RULES}
+          onSave={handleSavePointRules}
+          onClose={() => setShowSettings(false)}
+          cardCls={cardCls}
+          cardLight={cardLight}
+          cardDark={cardDark}
+          sectionLabel={sectionLabel}
+          mutedLight={mutedLight}
+          mutedDark={mutedDark}
+          inputLight={inputLight}
+          inputDark={inputDark}
+        />
+      )}
     </div>
   );
 };

@@ -8,8 +8,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#8c2a2a',    // 暗紅
-        secondary: '#2d5a4a',  // 墨綠
+        primary: 'var(--color-primary, #8c2a2a)',
+        secondary: 'var(--color-secondary, #2d5a4a)',
       },
     },
   },
