@@ -506,7 +506,9 @@ const App = () => {
     triggerToast();
   };
 
-  // 打牌時長：只看「現在往回 24 小時」內的紀錄，超過 24 小時自動重算。
+  // 打牌時長：依報表範圍動態計算
+  // - 本次：以本次（未結算）紀錄首末筆跨度
+  // - 本月/本年：以「每日首末筆跨度」加總，避免跨天閒置時間被算進去
   const durationStats = useMemo(() => {
     const getDurationParts = (ms) => {
       if (ms <= 0) return null;
@@ -516,20 +518,36 @@ const App = () => {
       return { h, m };
     };
     if (!reportRecords.length) return { parts: null, count: 0 };
-    const sortedTimes = reportRecords
+    const times = reportRecords
       .map(r => (r.date instanceof Date ? r.date : new Date(r.date)).getTime())
-      .filter(t => !Number.isNaN(t))
-      .sort((a, b) => a - b);
-    if (!sortedTimes.length) return { parts: null, count: 0 };
-    const now = Date.now();
-    const startLimit = now - (24 * 60 * 60 * 1000);
-    const recentWindow = sortedTimes.filter(t => t >= startLimit && t <= now);
-    const spanMs = recentWindow.length >= 2 ? (recentWindow[recentWindow.length - 1] - recentWindow[0]) : 0;
+      .filter(t => !Number.isNaN(t));
+    if (!times.length) return { parts: null, count: 0 };
+
+    let durationMs = 0;
+    if (reportRange === 'current') {
+      const sorted = [...times].sort((a, b) => a - b);
+      durationMs = sorted.length >= 2 ? sorted[sorted.length - 1] - sorted[0] : 0;
+    } else {
+      const perDay = new Map();
+      times.forEach((t) => {
+        const d = new Date(t);
+        const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+        const existing = perDay.get(key);
+        if (!existing) {
+          perDay.set(key, { min: t, max: t });
+        } else {
+          existing.min = Math.min(existing.min, t);
+          existing.max = Math.max(existing.max, t);
+        }
+      });
+      durationMs = Array.from(perDay.values()).reduce((acc, v) => acc + Math.max(0, v.max - v.min), 0);
+    }
+
     return {
-      parts: getDurationParts(spanMs),
-      count: recentWindow.length
+      parts: getDurationParts(durationMs),
+      count: reportRecords.length
     };
-  }, [reportRecords]);
+  }, [reportRecords, reportRange]);
 
   // 依時段打招呼 + 幽默短句（每次進入依當下時段選一句）
   const greeting = useMemo(() => {
@@ -930,7 +948,9 @@ const App = () => {
         <div className={`${cardCls} ${cardLight} ${cardDark} p-5 min-h-[168px] flex flex-col text-center`}>
           <div className="flex-1 flex flex-col items-center justify-center">
             <Clock size={20} className={`mb-2 ${mutedLight} ${mutedDark}`} />
-            <p className={`${calcLabel} mb-1.5`}>本次時長（24 小時內）</p>
+            <p className={`${calcLabel} mb-1.5`}>
+              {reportRange === 'current' ? '本次時長' : reportRange === 'month' ? '本月累積時長' : '本年累積時長'}
+            </p>
             <p className="text-gray-800 dark:text-[#ececec]">
               {durationStats.parts == null ? (
                 '—'
@@ -946,7 +966,11 @@ const App = () => {
             </p>
             {durationStats.count > 0 && <p className={`${reportCardSub} mt-1`}>{durationStats.count} 手</p>}
           </div>
-          <p className={`mt-3 pt-2.5 border-t border-gray-100 dark:border-[#2d302d] leading-relaxed ${reportCardSub}`}>以近 24 小時首末筆差計算，逾時自動重算</p>
+          <p className={`mt-3 pt-2.5 border-t border-gray-100 dark:border-[#2d302d] leading-relaxed ${reportCardSub}`}>
+            {reportRange === 'current'
+              ? '本次以首末筆差計算'
+              : '本月/本年以每日首末筆差累積'}
+          </p>
         </div>
       </section>
 
