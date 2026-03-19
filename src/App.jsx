@@ -314,7 +314,6 @@ const App = () => {
     }
   });
   const hasReportAccess = reportAccess.plan === 'monthly' || reportAccess.plan === 'lifetime';
-  const showAds = reportAccess.plan === 'free';
   const [isDark, setIsDark] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEYS.isDark) ?? 'false');
@@ -380,6 +379,7 @@ const App = () => {
   }, [selectedPoints, extraPoints, pointRules]);
 
   const currentTotalAmount = base + (currentTotalPoints * pointPrice);
+  const canAddCalcRecord = resultPosition != null;
 
   const togglePoint = (id) => {
     setSelectedPoints(prev => ({ ...prev, [id]: !prev[id] }));
@@ -432,6 +432,10 @@ const App = () => {
   };
 
   const addRecordFromCalc = () => {
+    if (!resultPosition) {
+      window.alert('請先選擇本手對象，再新增紀錄');
+      return;
+    }
     const amount = resultType === 'win' ? currentTotalAmount : -currentTotalAmount;
     addManualRecord(Math.abs(amount), resultType, undefined, {
       position: resultPosition ?? undefined,
@@ -1021,14 +1025,12 @@ const App = () => {
           {activeTab === 'record' && RecordView()}
           {activeTab === 'report' && ReportView()}
 
-          {/* 廣告：買斷終身後移除 */}
-          {showAds && (
-            <div className="mt-8 pt-6 pb-4 border-t border-gray-200/80 dark:border-[#2d302d] flex flex-col">
-              <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-[#3d403d] bg-[#F5F3F0] dark:bg-[#1a1c1a]/90 min-h-[80px] flex items-center justify-center">
-                <span className="text-[11px] font-medium text-gray-400 dark:text-[#c0c8c0]">Ad</span>
-              </div>
+          {/* 廣告區塊 */}
+          <div className="mt-8 pt-6 pb-4 border-t border-gray-200/80 dark:border-[#2d302d] flex flex-col">
+            <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-[#3d403d] bg-[#F5F3F0] dark:bg-[#1a1c1a]/90 min-h-[80px] flex items-center justify-center">
+              <span className="text-[11px] font-medium text-gray-400 dark:text-[#c0c8c0]">Ad</span>
             </div>
-          )}
+          </div>
 
           {/* 版權與 icon：貼近 footer、隨視窗滾動 */}
           <div className="py-4 flex flex-col items-center justify-center gap-2">
@@ -1083,8 +1085,13 @@ const App = () => {
               <button
                 type="button"
                 onClick={addRecordFromCalc}
-                className="flex items-center justify-center gap-1.5 px-3 py-3 bg-white/95 dark:bg-[#e0e4e0] text-primary font-semibold text-xs hover:bg-white dark:hover:bg-[#e8ece8] active:scale-[0.98] transition-all shrink-0"
-                title="以目前總金額新增紀錄"
+                disabled={!canAddCalcRecord}
+                className={`flex items-center justify-center gap-1.5 px-3 py-3 font-semibold text-xs transition-all shrink-0 ${
+                  canAddCalcRecord
+                    ? 'bg-white/95 dark:bg-[#e0e4e0] text-primary hover:bg-white dark:hover:bg-[#e8ece8] active:scale-[0.98]'
+                    : 'bg-white/60 dark:bg-[#c8cec8] text-primary/50 cursor-not-allowed'
+                }`}
+                title={canAddCalcRecord ? '以目前總金額新增紀錄' : '請先選擇本手對象'}
               >
                 <CheckCircle2 size={16} strokeWidth={2.2} />
                 新增紀錄
