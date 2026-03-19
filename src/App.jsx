@@ -7,7 +7,6 @@ import {
   Minus, 
   CheckCircle2, 
   Settings,
-  Calendar,
   Clock,
   Save,
   RotateCcw,
@@ -30,7 +29,16 @@ const DEFAULT_POINT_RULES = [
   { id: 'gshk', name: '槓上開花', pts: 2, cat: 'Big' },
 ];
 
-const STORAGE_KEYS = { pointRules: 'mahjong_point_rules', isDark: 'mahjong_is_dark', records: 'mahjong_records', base: 'mahjong_base', pointPrice: 'mahjong_point_price' };
+const STORAGE_KEYS = {
+  pointRules: 'mahjong_point_rules',
+  isDark: 'mahjong_is_dark',
+  records: 'mahjong_records',
+  base: 'mahjong_base',
+  pointPrice: 'mahjong_point_price',
+  currentSessionId: 'mahjong_current_session_id',
+  currentSessionStartedAt: 'mahjong_current_session_started_at',
+  reportAccess: 'mahjong_report_access'
+};
 
 // 手動紀錄表單：漏記、流局或非台數結算時可在此新增，用本地 state 管理輸入；字級與計算頁一致
 const recordFormTitle = 'text-base font-bold text-gray-800 dark:text-[#ececec]';
@@ -40,11 +48,14 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
   const [amount, setAmount] = useState('');
   const [type, setType] = useState('win');
   const [note, setNote] = useState('');
+  const [settlementUnit, setSettlementUnit] = useState('單手');
 
   const handleSubmit = () => {
     const num = parseInt(amount, 10);
     if (!amount || isNaN(num) || num <= 0) return;
-    onAddRecord(num, type, note);
+    onAddRecord(num, type, note, {
+      settlementUnit: settlementUnit === '單手' ? undefined : settlementUnit
+    });
     setAmount('');
     setNote('');
   };
@@ -52,10 +63,10 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
   return (
     <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
       <h3 className={`${recordFormTitle} mb-2 text-center`}>手動紀錄</h3>
-      <p className={`text-xs text-center ${mutedLight} ${mutedDark} mb-5`}>漏記、備註、非台數結算時可在此新增</p>
-      <div className="space-y-5 text-center">
+      <p className={`text-xs text-center ${mutedLight} ${mutedDark} mb-6`}>漏記、備註、非台數結算時可在此新增</p>
+      <div className="space-y-7 text-center">
         <div>
-          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>金額</label>
+          <label className={`block ${recordFormLabel} mb-3 ${mutedLight} ${mutedDark}`}>金額</label>
           <input
             type="text"
             inputMode="numeric"
@@ -67,7 +78,7 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
           />
         </div>
         <div>
-          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>類型</label>
+          <label className={`block ${recordFormLabel} mb-3 ${mutedLight} ${mutedDark}`}>類型</label>
           <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
             <button
               type="button"
@@ -93,8 +104,27 @@ const RecordForm = ({ onAddRecord, cardCls, cardLight, cardDark, mutedLight, mut
             </button>
           </div>
         </div>
+        <div className="pt-2">
+          <label className={`block ${recordFormLabel} mb-3 ${mutedLight} ${mutedDark}`}>結算單位</label>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            {['單手', '一將', '兩將', '三將', '四將'].map(unit => (
+              <button
+                key={unit}
+                type="button"
+                onClick={() => setSettlementUnit(unit)}
+                className={`py-2.5 rounded-xl font-semibold text-xs transition-all border ${
+                  settlementUnit === unit
+                    ? 'bg-gray-700 dark:bg-[#3d403d] border-gray-700 dark:border-[#4a5a4a] text-white'
+                    : `border-gray-200 dark:border-[#2d302d] ${mutedLight} ${mutedDark} hover:border-gray-300 dark:hover:border-[#4a5a4a]`
+                }`}
+              >
+                {unit}
+              </button>
+            ))}
+          </div>
+        </div>
         <div>
-          <label className={`block ${recordFormLabel} mb-2.5 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
+          <label className={`block ${recordFormLabel} mb-3 ${mutedLight} ${mutedDark}`}>備註 <span className="font-normal normal-case">(選填)</span></label>
           <input
             type="text"
             placeholder="例：昨晚牌局、請客..."
@@ -262,6 +292,29 @@ const App = () => {
   const [resultType, setResultType] = useState('win');        // 'win'|'expense'
   const [showToast, setShowToast] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [reportRange, setReportRange] = useState('current'); // 'current' | 'month' | 'year'
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEYS.currentSessionId); } catch (_) { return null; }
+  });
+  const [currentSessionStartedAt, setCurrentSessionStartedAt] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.currentSessionStartedAt);
+      return raw ? parseInt(raw, 10) : null;
+    } catch (_) { return null; }
+  });
+  const [reportAccess, setReportAccess] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.reportAccess);
+      if (!raw) return { plan: 'free', activatedAt: null };
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.plan) return { plan: 'free', activatedAt: null };
+      return parsed;
+    } catch (_) {
+      return { plan: 'free', activatedAt: null };
+    }
+  });
+  const hasReportAccess = reportAccess.plan === 'monthly' || reportAccess.plan === 'lifetime';
+  const showAds = reportAccess.plan === 'free';
   const [isDark, setIsDark] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEYS.isDark) ?? 'false');
@@ -281,6 +334,39 @@ const App = () => {
     document.documentElement.classList.toggle('dark', isDark);
     localStorage.setItem(STORAGE_KEYS.isDark, JSON.stringify(isDark));
   }, [isDark]);
+  useEffect(() => {
+    try {
+      if (currentSessionId) localStorage.setItem(STORAGE_KEYS.currentSessionId, currentSessionId);
+      else localStorage.removeItem(STORAGE_KEYS.currentSessionId);
+    } catch (_) {}
+  }, [currentSessionId]);
+  useEffect(() => {
+    try {
+      if (currentSessionStartedAt) localStorage.setItem(STORAGE_KEYS.currentSessionStartedAt, String(currentSessionStartedAt));
+      else localStorage.removeItem(STORAGE_KEYS.currentSessionStartedAt);
+    } catch (_) {}
+  }, [currentSessionStartedAt]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.reportAccess, JSON.stringify(reportAccess));
+    } catch (_) {}
+  }, [reportAccess]);
+  useEffect(() => {
+    if (currentSessionId || !records.length) return;
+    const unsettled = records.filter(r => !r.settledAt);
+    if (!unsettled.length) return;
+    const existingSessionId = unsettled.find(r => r.sessionId)?.sessionId;
+    const sessionStart = unsettled
+      .map(r => (r.date instanceof Date ? r.date : new Date(r.date)).getTime())
+      .filter(t => !Number.isNaN(t))
+      .sort((a, b) => a - b)[0] ?? Date.now();
+    const generatedSessionId =
+      (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `session_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    setCurrentSessionId(existingSessionId || generatedSessionId);
+    setCurrentSessionStartedAt(sessionStart);
+  }, [records, currentSessionId]);
 
   const currentTotalPoints = useMemo(() => {
     let pts = extraPoints;
@@ -299,20 +385,50 @@ const App = () => {
     setSelectedPoints(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const createSessionId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return `session_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  };
+
+  const ensureCurrentSession = () => {
+    if (currentSessionId) return currentSessionId;
+    const nextId = createSessionId();
+    setCurrentSessionId(nextId);
+    setCurrentSessionStartedAt(Date.now());
+    return nextId;
+  };
+
+  const startSessionManually = () => {
+    if (currentSessionId) return;
+    const nextId = createSessionId();
+    setCurrentSessionId(nextId);
+    setCurrentSessionStartedAt(Date.now());
+    triggerToast();
+  };
+
   const addManualRecord = (amountNum, type, note, extra = {}) => {
     const num = typeof amountNum === 'number' ? amountNum : parseInt(amountNum, 10);
     if (num == null || isNaN(num)) return;
+    const sessionId = ensureCurrentSession();
     const newRecord = {
-      id: Date.now(),
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.floor(Math.random() * 100000)}`,
       amount: type === 'win' ? Math.abs(num) : -Math.abs(num),
       date: new Date(),
       type: type === 'win' ? 'win' : 'loss',
       note: (note && note.trim()) || undefined,
+      sessionId,
+      ...(extra.settlementUnit != null && { settlementUnit: extra.settlementUnit }),
       ...(extra.position != null && { position: extra.position }),
       ...(extra.points != null && Number.isInteger(extra.points) && { points: extra.points })
     };
     setRecords(prev => [newRecord, ...prev]);
     triggerToast();
+  };
+
+  const resetCalcSelections = () => {
+    setSelectedPoints({});
+    setExtraPoints(0);
+    setResultPosition(null);
   };
 
   const addRecordFromCalc = () => {
@@ -321,6 +437,7 @@ const App = () => {
       position: resultPosition ?? undefined,
       points: currentTotalPoints
     });
+    resetCalcSelections();
   };
 
   const triggerToast = () => {
@@ -336,15 +453,28 @@ const App = () => {
     triggerToast();
   };
 
+  const reportRecords = useMemo(() => {
+    const now = new Date();
+    const isInMonth = (d) => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    const isInYear = (d) => d.getFullYear() === now.getFullYear();
+    return records.filter(r => {
+      const d = r.date instanceof Date ? r.date : new Date(r.date);
+      if (reportRange === 'current') return !r.settledAt;
+      return reportRange === 'month' ? isInMonth(d) : isInYear(d);
+    });
+  }, [records, reportRange]);
+
   const stats = useMemo(() => {
-    const total = records.reduce((acc, cur) => acc + cur.amount, 0);
-    const winCount = records.filter(r => r.amount > 0).length;
-    const wins = records.filter(r => r.amount > 0).map(r => r.amount);
-    const losses = records.filter(r => r.amount < 0).map(r => r.amount);
+    const total = reportRecords.reduce((acc, cur) => acc + cur.amount, 0);
+    const winCount = reportRecords.filter(r => r.amount > 0).length;
+    const wins = reportRecords.filter(r => r.amount > 0).map(r => r.amount);
+    const losses = reportRecords.filter(r => r.amount < 0).map(r => r.amount);
     const maxWin = wins.length ? Math.max(...wins) : 0;
     const maxLoss = losses.length ? Math.min(...losses) : 0;
-    return { total, winCount, totalCount: records.length, maxWin, maxLoss };
-  }, [records]);
+    const totalCount = reportRecords.length;
+    const winRate = totalCount ? Math.round((winCount / totalCount) * 100) : 0;
+    return { total, winCount, totalCount, maxWin, maxLoss, winRate };
+  }, [reportRecords]);
 
   // 依對象（上家/下家/對家）自動加總：只計「未結算」的紀錄。正數＝他要給你，負數＝你要給他。
   const positionSums = useMemo(() => {
@@ -367,18 +497,13 @@ const App = () => {
   const handleCompleteSettlement = () => {
     if (!window.confirm('確定完成本次結算？依對象結算將歸零，歷史紀錄與報表仍會保留。')) return;
     setRecords(prev => prev.map(r => ({ ...r, settledAt: r.settledAt ?? Date.now() })));
+    setCurrentSessionId(null);
+    setCurrentSessionStartedAt(null);
     triggerToast();
   };
 
-  // 從紀錄時間計算：今天／本月 打牌時長（首筆到末筆的時間跨度）
+  // 打牌時長：只看「現在往回 24 小時」內的紀錄，超過 24 小時自動重算。
   const durationStats = useMemo(() => {
-    const toDate = (r) => {
-      const d = r.date;
-      return d instanceof Date ? d : new Date(d);
-    };
-    const now = new Date();
-    const isToday = (d) => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-    const isThisMonth = (d) => d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     const getDurationParts = (ms) => {
       if (ms <= 0) return null;
       const totalMins = Math.floor(ms / 60000);
@@ -386,20 +511,21 @@ const App = () => {
       const m = totalMins % 60;
       return { h, m };
     };
-    const todayRecords = records.filter(r => isToday(toDate(r)));
-    const monthRecords = records.filter(r => isThisMonth(toDate(r)));
-    const span = (arr) => {
-      if (arr.length < 2) return 0;
-      const dates = arr.map(r => toDate(r).getTime());
-      return Math.max(...dates) - Math.min(...dates);
-    };
+    if (!reportRecords.length) return { parts: null, count: 0 };
+    const sortedTimes = reportRecords
+      .map(r => (r.date instanceof Date ? r.date : new Date(r.date)).getTime())
+      .filter(t => !Number.isNaN(t))
+      .sort((a, b) => a - b);
+    if (!sortedTimes.length) return { parts: null, count: 0 };
+    const now = Date.now();
+    const startLimit = now - (24 * 60 * 60 * 1000);
+    const recentWindow = sortedTimes.filter(t => t >= startLimit && t <= now);
+    const spanMs = recentWindow.length >= 2 ? (recentWindow[recentWindow.length - 1] - recentWindow[0]) : 0;
     return {
-      todayParts: getDurationParts(span(todayRecords)),
-      todayCount: todayRecords.length,
-      monthParts: getDurationParts(span(monthRecords)),
-      monthCount: monthRecords.length
+      parts: getDurationParts(spanMs),
+      count: recentWindow.length
     };
-  }, [records]);
+  }, [reportRecords]);
 
   // 依時段打招呼 + 幽默短句（每次進入依當下時段選一句）
   const greeting = useMemo(() => {
@@ -407,10 +533,10 @@ const App = () => {
     const timeWord = hour >= 5 && hour < 12 ? '早安' : hour >= 12 && hour < 18 ? '午安' : '晚安';
     const phrases = [
       '是不是又忍不住打麻將了？',
-      '就知道你又來打麻將了！',
-      '手癢了齁，來算一局吧',
-      '今天也要胡好胡滿喔',
-      '算好台數，安心開打',
+      '就知道你又想開打了！',
+      '手癢了齁，來打一將吧！',
+      '今天也要胡好胡滿喔！',
+      '台數好算，安心開打',
       '三缺一還是已經開打了？',
     ];
     const phrase = phrases[hour % phrases.length];
@@ -589,7 +715,14 @@ const App = () => {
           {records.length > 0 && (
             <button
               type="button"
-              onClick={() => { if (window.confirm('確定要清除全部紀錄嗎？')) { setRecords([]); triggerToast(); } }}
+              onClick={() => {
+                if (window.confirm('確定要清除全部紀錄嗎？')) {
+                  setRecords([]);
+                  setCurrentSessionId(null);
+                  setCurrentSessionStartedAt(null);
+                  triggerToast();
+                }
+              }}
               className={`text-xs font-medium shrink-0 ${mutedLight} ${mutedDark} hover:text-red-500 dark:hover:text-[#ff8080] transition-colors`}
             >
               清除紀錄
@@ -612,9 +745,9 @@ const App = () => {
                       {record.date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })} · {record.date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
                       {record.settledAt && <span className="ml-1.5 text-[10px] text-primary">已結算</span>}
                     </p>
-                    {(record.position || record.points != null) && (
+                    {(record.position || record.points != null || record.settlementUnit) && (
                       <p className={`text-xs mt-0.5 ${mutedLight} ${mutedDark}`}>
-                        {[record.position, record.points != null ? `${record.points} 台` : null].filter(Boolean).join(' · ')}
+                        {[record.settlementUnit, record.position, record.points != null ? `${record.points} 台` : null].filter(Boolean).join(' · ')}
                       </p>
                     )}
                     {record.note && (
@@ -643,6 +776,11 @@ const App = () => {
       <section className={`${cardCls} ${cardLight} ${cardDark} p-6 space-y-4 text-center`}>
         <h4 className={calcSectionTitle}>本次依對象結算</h4>
         <p className={`text-xs ${mutedLight} ${mutedDark}`}>正數＝他要給你，負數＝你要給他</p>
+        <p className={`text-[11px] ${mutedLight} ${mutedDark}`}>
+          {hasUnsettled
+            ? `牌局進行中${currentSessionStartedAt ? `（開始於 ${new Date(currentSessionStartedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}）` : ''}`
+            : '尚未開始本次牌局'}
+        </p>
         {(['上家', '下家', '對家']).map(pos => (
           <div key={pos} className="flex justify-center items-center gap-4">
             <span className={`text-sm font-medium ${mutedLight} ${mutedDark}`}>{pos}</span>
@@ -651,6 +789,15 @@ const App = () => {
             </span>
           </div>
         ))}
+        {!hasUnsettled && (
+          <button
+            type="button"
+            onClick={startSessionManually}
+            className={`w-full mt-2 py-3 rounded-xl font-semibold text-sm border-2 border-dashed border-gray-300 dark:border-[#3d403d] ${mutedLight} ${mutedDark} hover:border-secondary hover:text-secondary transition-colors`}
+          >
+            開始本次牌局
+          </button>
+        )}
         {hasUnsettled && (
           <>
             <button
@@ -673,99 +820,134 @@ const App = () => {
   const reportRowLabel = `text-sm font-medium ${mutedLight} ${mutedDark}`;
   const reportRowValue = 'text-sm font-semibold tabular-nums';
 
+  const ReportPaywall = () => (
+    <section className={`${cardCls} ${cardLight} ${cardDark} p-6 space-y-5 text-center`}>
+      <h3 className={calcSectionTitle}>升級方案</h3>
+      <p className={`text-sm leading-relaxed ${mutedLight} ${mutedDark}`}>
+        計算與紀錄可免費使用（含廣告），升級後即可解鎖進階報表。
+      </p>
+      <div className="grid grid-cols-1 gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (!window.confirm('確認開通月訂閱 NT$30？（目前為本機示意，未串接金流）')) return;
+            setReportAccess({ plan: 'monthly', activatedAt: Date.now() });
+            triggerToast();
+          }}
+          className="w-full py-3.5 rounded-xl font-semibold text-sm bg-secondary text-white hover:opacity-90 transition-opacity"
+        >
+          月訂閱 NT$30（解鎖報表）
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!window.confirm('確認一次性買斷 NT$150？（目前為本機示意，未串接金流）')) return;
+            setReportAccess({ plan: 'lifetime', activatedAt: Date.now() });
+            triggerToast();
+          }}
+          className="w-full py-3.5 rounded-xl font-semibold text-sm bg-primary text-white hover:opacity-90 transition-opacity"
+        >
+          一次買斷 NT$150（解鎖報表＋移除廣告）
+        </button>
+      </div>
+      <div className={`pt-2.5 border-t border-gray-100 dark:border-[#2d302d] text-[11px] leading-relaxed ${mutedLight} ${mutedDark}`}>
+        <p>免費版：可計算與紀錄（含廣告）</p>
+        <p>月訂閱：解鎖報表並移除廣告</p>
+        <p>買斷終身：解鎖報表並移除廣告</p>
+      </div>
+    </section>
+  );
+
   const ReportView = () => (
-    <div className="space-y-8">
+    <div className="space-y-7">
+      {!hasReportAccess ? (
+        <ReportPaywall />
+      ) : (
+        <>
       <section>
-        <div className="flex items-center gap-3 px-1 mb-4">
+        <div className="flex items-center gap-3 px-1 mb-3.5">
           <span className={calcLabel}>總覽</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
-            <p className={`text-sm font-semibold mb-2 ${mutedLight} ${mutedDark}`}>總輸贏</p>
-            <p className={`${reportCardValue} ${stats.total >= 0 ? 'text-secondary' : 'text-red-500 dark:text-[#ff8080]'}`}>
-              ${stats.total}
-            </p>
+        <div className="flex justify-center mb-3.5">
+          <div className="inline-flex items-center p-1 rounded-2xl bg-gray-100 dark:bg-[#0f110f] border border-gray-200 dark:border-[#2d302d]">
+            <button
+              type="button"
+              onClick={() => setReportRange('current')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${reportRange === 'current' ? 'bg-primary text-white' : mutedLight + ' ' + mutedDark}`}
+            >
+              本次
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportRange('month')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${reportRange === 'month' ? 'bg-primary text-white' : mutedLight + ' ' + mutedDark}`}
+            >
+              本月
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportRange('year')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${reportRange === 'year' ? 'bg-primary text-white' : mutedLight + ' ' + mutedDark}`}
+            >
+              本年
+            </button>
           </div>
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-6 text-center`}>
-            <p className={`text-sm font-semibold mb-2 ${mutedLight} ${mutedDark}`}>勝率</p>
-            <p className={reportCardValue}>
-              {stats.totalCount ? Math.round((stats.winCount / stats.totalCount) * 100) : 0}%
-            </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3.5">
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 min-h-[148px] text-center flex flex-col`}>
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <p className={`text-sm font-semibold ${mutedLight} ${mutedDark} mb-2.5`}>
+                {reportRange === 'current' ? '本次輸贏' : reportRange === 'month' ? '本月輸贏' : '本年輸贏'}
+              </p>
+              <p className={`${reportCardValue} ${stats.total >= 0 ? 'text-secondary' : 'text-red-500 dark:text-[#ff8080]'}`}>
+                ${stats.total}
+              </p>
+            </div>
+            <p className={`mt-3 pt-2.5 border-t border-gray-100 dark:border-[#2d302d] text-center leading-relaxed ${reportCardSub}`}>本期累計淨額</p>
+          </div>
+          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 min-h-[148px] text-center flex flex-col`}>
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <p className={`text-sm font-semibold ${mutedLight} ${mutedDark} mb-2.5`}>勝率</p>
+              <p className={reportCardValue}>
+                {stats.winRate}%
+              </p>
+            </div>
+            <p className={`mt-3 pt-2.5 border-t border-gray-100 dark:border-[#2d302d] text-center leading-relaxed ${reportCardSub}`}>贏錢手數 / 紀錄手數</p>
           </div>
         </div>
       </section>
 
       <section>
-        <div className="flex items-center gap-3 px-1 mb-4">
+        <div className="flex items-center gap-3 px-1 mb-3.5">
           <span className={calcLabel}>打牌時長</span>
           <div className="h-px flex-1 bg-gray-200 dark:bg-[#2d302d]" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 flex flex-col items-center justify-center text-center`}>
+        <div className={`${cardCls} ${cardLight} ${cardDark} p-5 min-h-[168px] flex flex-col text-center`}>
+          <div className="flex-1 flex flex-col items-center justify-center">
             <Clock size={20} className={`mb-2 ${mutedLight} ${mutedDark}`} />
-            <p className={`${calcLabel} mb-2`}>今天打了多久</p>
+            <p className={`${calcLabel} mb-1.5`}>本次時長（24 小時內）</p>
             <p className="text-gray-800 dark:text-[#ececec]">
-              {durationStats.todayParts == null ? (
+              {durationStats.parts == null ? (
                 '—'
               ) : (
                 <>
-                  {durationStats.todayParts.h > 0 && (
-                    <><span className="text-base font-semibold tabular-nums">{durationStats.todayParts.h}</span><span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 小時 </span></>
+                  {durationStats.parts.h > 0 && (
+                    <><span className="text-base font-semibold tabular-nums">{durationStats.parts.h}</span><span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 小時 </span></>
                   )}
-                  <span className="text-base font-semibold tabular-nums">{durationStats.todayParts.m}</span>
+                  <span className="text-base font-semibold tabular-nums">{durationStats.parts.m}</span>
                   <span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 分鐘</span>
                 </>
               )}
             </p>
-            {durationStats.todayCount > 0 && (
-              <p className={`${reportCardSub} mt-1`}>{durationStats.todayCount} 手</p>
-            )}
+            {durationStats.count > 0 && <p className={`${reportCardSub} mt-1`}>{durationStats.count} 手</p>}
           </div>
-          <div className={`${cardCls} ${cardLight} ${cardDark} p-5 flex flex-col items-center justify-center text-center`}>
-            <Clock size={20} className={`mb-2 ${mutedLight} ${mutedDark}`} />
-            <p className={`${calcLabel} mb-2`}>本月打了多久</p>
-            <p className="text-gray-800 dark:text-[#ececec]">
-              {durationStats.monthParts == null ? (
-                '—'
-              ) : (
-                <>
-                  {durationStats.monthParts.h > 0 && (
-                    <><span className="text-base font-semibold tabular-nums">{durationStats.monthParts.h}</span><span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 小時 </span></>
-                  )}
-                  <span className="text-base font-semibold tabular-nums">{durationStats.monthParts.m}</span>
-                  <span className="text-xs font-medium text-gray-500 dark:text-[#c0c8c0] ml-0.5"> 分鐘</span>
-                </>
-              )}
-            </p>
-            {durationStats.monthCount > 0 && (
-              <p className={`${reportCardSub} mt-1`}>{durationStats.monthCount} 手</p>
-            )}
-          </div>
-        </div>
-        <p className={`mt-3 text-center ${reportCardSub}`}>依第一筆與最後一筆紀錄時間計算</p>
-      </section>
-
-      <section className={`${cardCls} ${cardLight} ${cardDark} p-6`}>
-        <h4 className={`${calcSectionTitle} mb-4 flex items-center gap-2`}>
-          <Calendar size={16} className="text-primary" />
-          月度趨勢
-        </h4>
-        <div className="h-32 flex items-end gap-2 justify-between px-2">
-          {[40, 70, 45, 90, 65, 80, 50].map((h, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2">
-              <div
-                className={`w-full rounded-t-lg transition-all duration-500 ${i === 3 ? 'bg-primary' : 'bg-gray-200 dark:bg-[#2d302d]'}`}
-                style={{ height: `${h}%` }}
-              />
-              <span className={reportCardSub}>{i + 1}月</span>
-            </div>
-          ))}
+          <p className={`mt-3 pt-2.5 border-t border-gray-100 dark:border-[#2d302d] leading-relaxed ${reportCardSub}`}>以近 24 小時首末筆差計算，逾時自動重算</p>
         </div>
       </section>
 
-      <section className={`${cardCls} ${cardLight} ${cardDark} p-6 space-y-4`}>
-        <h4 className={calcSectionTitle}>本年統計摘要</h4>
+      <section className={`${cardCls} ${cardLight} ${cardDark} p-5 space-y-3.5`}>
+        <h4 className={calcSectionTitle}>{reportRange === 'current' ? '本次統計摘要' : reportRange === 'month' ? '本月統計摘要' : '本年統計摘要'}</h4>
         <div className="flex justify-between items-center">
           <span className={reportRowLabel}>紀錄手數</span>
           <span className={reportRowValue}>{stats.totalCount} 手</span>
@@ -782,10 +964,12 @@ const App = () => {
             {stats.maxLoss < 0 ? `-$${Math.abs(stats.maxLoss).toLocaleString()}` : '$0'}
           </span>
         </div>
-        <p className={`pt-2 border-t border-gray-100 dark:border-[#2d302d] ${reportCardSub}`}>
+        <p className={`pt-2.5 border-t border-gray-100 dark:border-[#2d302d] leading-relaxed ${reportCardSub}`}>
           數據僅含已新增紀錄，流局未計入
         </p>
       </section>
+        </>
+      )}
     </div>
   );
 
@@ -830,19 +1014,21 @@ const App = () => {
       {/* ----- 可捲動主內容 (只有這裡會捲動) ----- */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden w-full">
         <div className="max-w-md mx-auto px-4 py-6 pb-0">
-          <p className={`text-sm font-medium mb-5 text-center ${mutedLight} ${mutedDark}`}>
+          <p className={`text-sm font-medium mt-2 mb-7 text-center ${mutedLight} ${mutedDark}`}>
             {greeting}
           </p>
           {activeTab === 'calc' && CalcView()}
           {activeTab === 'record' && RecordView()}
           {activeTab === 'report' && ReportView()}
 
-          {/* 廣告：在 main 裡會隨頁面捲動 */}
-          <div className="mt-8 pt-6 pb-4 border-t border-gray-200/80 dark:border-[#2d302d] flex flex-col">
-            <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-[#3d403d] bg-[#F5F3F0] dark:bg-[#1a1c1a]/90 min-h-[80px] flex items-center justify-center">
-              <span className="text-[11px] font-medium text-gray-400 dark:text-[#c0c8c0]">Ad</span>
+          {/* 廣告：買斷終身後移除 */}
+          {showAds && (
+            <div className="mt-8 pt-6 pb-4 border-t border-gray-200/80 dark:border-[#2d302d] flex flex-col">
+              <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-[#3d403d] bg-[#F5F3F0] dark:bg-[#1a1c1a]/90 min-h-[80px] flex items-center justify-center">
+                <span className="text-[11px] font-medium text-gray-400 dark:text-[#c0c8c0]">Ad</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 版權與 icon：貼近 footer、隨視窗滾動 */}
           <div className="py-4 flex flex-col items-center justify-center gap-2">
@@ -868,7 +1054,7 @@ const App = () => {
                 <Instagram size={18} strokeWidth={1.5} />
               </a>
               <a
-                href="mailto:workbyaria@gmail.com"
+                href="mailto:friendlycatgroup@gmail.com"
                 className="p-2 text-gray-600 dark:text-[#d0d4d0] hover:opacity-80 transition-opacity"
                 aria-label="Email"
               >
@@ -930,7 +1116,7 @@ const App = () => {
               className={`flex flex-col items-center gap-1 min-w-[72px] py-2.5 px-3 rounded-2xl transition-all ${activeTab === 'report' ? 'bg-gray-600 dark:bg-gray-500 text-white shadow-md' : mutedLight + ' ' + mutedDark}`}
             >
               <BarChart3 size={22} strokeWidth={activeTab === 'report' ? 3 : 2} />
-              <span className="text-[10px] font-bold">報表</span>
+              <span className="text-[10px] font-bold">{hasReportAccess ? '報表' : '報表Pro'}</span>
             </button>
           </nav>
         </div>
